@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "c68nCsWGEbE6j+VvyzfR8nzDFFHe1kioVP/ugajmwqA=",
+  "Source": "IncidentReportApi",
+  "BasePath": "_content/IncidentReportApi",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
