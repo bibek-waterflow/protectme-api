@@ -8,7 +8,6 @@ public static class PoliceReportEndpoints
         // POST: Submit a police report
         app.MapPost("/postreport", async (PoliceReportModel report, MySqlConnection db) =>
         {
-            // Validate the model
             var validationResults = new List<ValidationResult>();
             var validationContext = new ValidationContext(report);
             bool isValid = Validator.TryValidateObject(report, validationContext, validationResults, true);
@@ -18,9 +17,11 @@ public static class PoliceReportEndpoints
                 return Results.BadRequest(new { Message = "Validation failed", Errors = validationResults });
             }
 
-            var query = "INSERT INTO PoliceReports (FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath) VALUES (@FullName, @MobileNumber, @IncidentType, @DateTime, @Description, @Address, @PoliceStation, @EvidenceFilePath)";
+            var query = "INSERT INTO PoliceReports (UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath) " +
+                        "VALUES (@UserId, @FullName, @MobileNumber, @IncidentType, @DateTime, @Description, @Address, @PoliceStation, @EvidenceFilePath)";
 
             await using var cmd = new MySqlCommand(query, db);
+            cmd.Parameters.AddWithValue("@UserId", report.UserId);
             cmd.Parameters.AddWithValue("@FullName", report.FullName);
             cmd.Parameters.AddWithValue("@MobileNumber", report.MobileNumber);
             cmd.Parameters.AddWithValue("@IncidentType", report.IncidentType);
@@ -41,7 +42,7 @@ public static class PoliceReportEndpoints
         {
             var reports = new List<PoliceReportModel>();
 
-            var query = "SELECT Id, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath FROM PoliceReports";
+            var query = "SELECT Id, UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath FROM PoliceReports";
             await using var cmd = new MySqlCommand(query, db);
             await db.OpenAsync();
 
@@ -51,14 +52,15 @@ public static class PoliceReportEndpoints
                 reports.Add(new PoliceReportModel
                 {
                     Id = reader.GetInt32(0),
-                    FullName = reader.GetString(1),
-                    MobileNumber = reader.GetString(2),
-                    IncidentType = reader.GetString(3),
-                    DateTime = reader.GetDateTime(4),
-                    Description = reader.GetString(5),
-                    Address = reader.GetString(6),
-                    PoliceStation = reader.GetString(7),
-                    EvidenceFilePath = reader.GetString(8).Split(',').ToList()
+                    UserId = reader.GetInt32(1),
+                    FullName = reader.GetString(2),
+                    MobileNumber = reader.GetString(3),
+                    IncidentType = reader.GetString(4),
+                    DateTime = reader.GetDateTime(5),
+                    Description = reader.GetString(6),
+                    Address = reader.GetString(7),
+                    PoliceStation = reader.GetString(8),
+                    EvidenceFilePath = reader.GetString(9).Split(',').ToList()
                 });
             }
 
@@ -68,7 +70,6 @@ public static class PoliceReportEndpoints
         // PUT: Update a police report
         app.MapPut("/updatereport/{id}", async (int id, PoliceReportModel report, MySqlConnection db) =>
         {
-            // Validate the model
             var validationResults = new List<ValidationResult>();
             var validationContext = new ValidationContext(report);
             bool isValid = Validator.TryValidateObject(report, validationContext, validationResults, true);
@@ -78,10 +79,12 @@ public static class PoliceReportEndpoints
                 return Results.BadRequest(new { Message = "Validation failed", Errors = validationResults });
             }
 
-            var query = "UPDATE PoliceReports SET FullName = @FullName, MobileNumber = @MobileNumber, IncidentType = @IncidentType, DateTime = @DateTime, Description = @Description, Address = @Address, PoliceStation = @PoliceStation, EvidenceFilePath = @EvidenceFilePath WHERE Id = @Id";
+            var query = "UPDATE PoliceReports SET UserId = @UserId, FullName = @FullName, MobileNumber = @MobileNumber, IncidentType = @IncidentType, DateTime = @DateTime, " +
+                        "Description = @Description, Address = @Address, PoliceStation = @PoliceStation, EvidenceFilePath = @EvidenceFilePath WHERE Id = @Id";
 
             await using var cmd = new MySqlCommand(query, db);
             cmd.Parameters.AddWithValue("@Id", id);
+            cmd.Parameters.AddWithValue("@UserId", report.UserId);
             cmd.Parameters.AddWithValue("@FullName", report.FullName);
             cmd.Parameters.AddWithValue("@MobileNumber", report.MobileNumber);
             cmd.Parameters.AddWithValue("@IncidentType", report.IncidentType);

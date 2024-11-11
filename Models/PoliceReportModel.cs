@@ -1,10 +1,11 @@
-
 using System.ComponentModel.DataAnnotations;
 
 public class PoliceReportModel
 {
-    [Required]
     public int Id { get; set; }
+
+    [Required]
+    public int UserId { get; set; } // New field for user identification
 
     [Required]
     [StringLength(100)]
@@ -29,5 +30,5 @@ public class PoliceReportModel
     [Required]
     public string? PoliceStation { get; set; }
 
-    public List<string>? EvidenceFilePath { get; set; } // Store file path in DB
+    public List<string>? EvidenceFilePath { get; set; }
 }
