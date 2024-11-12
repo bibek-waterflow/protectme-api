@@ -1,0 +1,20 @@
+name: Docker Compose Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: protect-me
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker Compose file
+        run: docker-compose build
+
+      - name: Run Docker Compose
+        run: docker-compose up -d
