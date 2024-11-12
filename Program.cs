@@ -43,7 +43,7 @@ app.UseCors("AllowAll");
 // Configure API endpoints
 app.ConfigureUserEndpoints();         // Handles user registration and management
 app.ConfigurePoliceReportEndpoints(); // Handles police report submission and retrieval
-app.ConfigureHelpCenterEndpoints();   // Handles help center related requests
+//app.ConfigureHelpCenterEndpoints();   // Handles help center related requests
 app.ConfigureGoogleAuthEndpoints();   // Handles Google Sign-In and Sign-Up
 
 app.Run();
