@@ -6,7 +6,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8088:80"
+      - "5047:5047"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
     depends_on:
       - mysql
 

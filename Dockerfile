@@ -16,7 +16,7 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Expose the port the app will run on
-EXPOSE 80
+EXPOSE 5047
 
 # Run the application
 ENTRYPOINT ["dotnet", "IncidentReportApi.dll"]
