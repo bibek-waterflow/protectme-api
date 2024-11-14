@@ -13,6 +13,7 @@ RUN dotnet publish -c Release -o /app/publish
 # Use a runtime image for deployment
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
+COPY Migrations /app/Migrations
 COPY --from=build /app/publish .
 
 # Expose the port the app will run on
