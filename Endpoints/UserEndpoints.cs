@@ -42,7 +42,7 @@ public static class UserEndpoints
             // Hash the password before storing it
             model.Password = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
-            var query = "INSERT INTO HelpCenters (Name, Address, Email, PhoneNumber, Password, Role) VALUES (@Name, @Address, @Email, @PhoneNumber, @Password, @Role)";
+            var query = "INSERT INTO HelpCenters (Name, Address, Email, PhoneNumber, Password, Role, Latitude, Longitude) VALUES (@Name, @Address, @Email, @PhoneNumber, @Password, @Role, @Latitude, @Longitude)";
 
             await using var cmd = new MySqlCommand(query, db);
 
@@ -52,6 +52,8 @@ public static class UserEndpoints
             cmd.Parameters.AddWithValue("@PhoneNumber", model.PhoneNumber);
             cmd.Parameters.AddWithValue("@Password", model.Password);
             cmd.Parameters.AddWithValue("@Role", "Police Station");
+            cmd.Parameters.AddWithValue("@Latitude", model.Latitude);
+            cmd.Parameters.AddWithValue("@Longitude", model.Longitude);
 
             try
             {
@@ -185,23 +187,25 @@ public static class UserEndpoints
         // CRUD operations for Help Centers
         app.MapGet("/helpcenters", async (MySqlConnection db) =>
         {
-            var helpCenters = new List<HelpCenterModel>();
+            var helpCenters = new List<HelpCenterRegistrationModel>();
 
-            var query = "SELECT Name, Address, Email, PhoneNumber FROM HelpCenters";
+            var query = "SELECT Name, Address, Email, PhoneNumber, Latitude, Longitude FROM HelpCenters";
             await using var cmd = new MySqlCommand(query, db);
             await db.OpenAsync();
 
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                helpCenters.Add(new HelpCenterModel
+                helpCenters.Add(new HelpCenterRegistrationModel
                 {
                     Name = reader.GetString(0),
                     Address = reader.GetString(1),
                     Email = reader.GetString(2),
                     PhoneNumber = reader.GetString(3),
+                    Latitude = reader.GetDouble(4),
+                    Longitude = reader.GetDouble(5),
                     Password = null, // Do not retrieve passwords for security
-                    ConfirmPassword = ""
+                    
                 });
             }
 
@@ -215,13 +219,15 @@ public static class UserEndpoints
                 return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
             }
 
-            var query = "UPDATE HelpCenters SET Name = @Name, Address = @Address, Email = @Email, PhoneNumber = @PhoneNumber WHERE Id = @Id";
+            var query = "UPDATE HelpCenters SET Name = @Name, Address = @Address, Email = @Email, PhoneNumber = @PhoneNumber, Latitude = @Latitude, Longitude = @Longitude WHERE Id = @Id";
             await using var cmd = new MySqlCommand(query, db);
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.Parameters.AddWithValue("@Name", model.Name);
             cmd.Parameters.AddWithValue("@Address", model.Address);
             cmd.Parameters.AddWithValue("@Email", model.Email);
             cmd.Parameters.AddWithValue("@PhoneNumber", model.PhoneNumber);
+            cmd.Parameters.AddWithValue("@Latitude", model.Latitude);
+            cmd.Parameters.AddWithValue("@Longitude", model.Longitude);
 
             await db.OpenAsync();
             var rowsAffected = await cmd.ExecuteNonQueryAsync();
@@ -369,15 +375,6 @@ public class UserRegistrationModel
     public string Email { get; set; }
     public string PhoneNumber { get; set; }
     public string Address { get; set; }
-    public string Password { get; set; }
-}
-
-public class HelpCenterRegistrationModel
-{
-    public string Name { get; set; }
-    public string Address { get; set; }
-    public string Email { get; set; }
-    public string PhoneNumber { get; set; }
     public string Password { get; set; }
 }
 
