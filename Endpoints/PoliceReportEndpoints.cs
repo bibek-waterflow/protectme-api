@@ -9,104 +9,151 @@ public static class PoliceReportEndpoints
         // Create a new police report
         app.MapPost("/createreport", async (PoliceReportModel model, MySqlConnection db) =>
         {
-            if (!IsValid(model, out var validationErrors))
+            try
             {
-                return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
+                if (!IsValid(model, out var validationErrors))
+                {
+                    return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
+                }
+
+                var query = "INSERT INTO PoliceReports (UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath, Status) VALUES (@UserId, @FullName, @MobileNumber, @IncidentType, @DateTime, @Description, @Address, @PoliceStation, @EvidenceFilePath, @Status)";
+                await using var cmd = new MySqlCommand(query, db);
+                cmd.Parameters.AddWithValue("@UserId", model.UserId);
+                cmd.Parameters.AddWithValue("@FullName", model.FullName);
+                cmd.Parameters.AddWithValue("@MobileNumber", model.MobileNumber);
+                cmd.Parameters.AddWithValue("@IncidentType", model.IncidentType);
+                cmd.Parameters.AddWithValue("@DateTime", model.DateTime);
+                cmd.Parameters.AddWithValue("@Description", model.Description);
+                cmd.Parameters.AddWithValue("@Address", model.Address);
+                cmd.Parameters.AddWithValue("@PoliceStation", model.PoliceStation);
+                cmd.Parameters.AddWithValue("@EvidenceFilePath", string.Join(",", model.EvidenceFilePath));
+                cmd.Parameters.AddWithValue("@Status", "In Progress");
+
+                await db.OpenAsync();
+                await cmd.ExecuteNonQueryAsync();
+
+                return Results.Ok(new { Message = "Police report submitted successfully." });
             }
-
-            var query = "INSERT INTO PoliceReports (UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath, Status) VALUES (@UserId, @FullName, @MobileNumber, @IncidentType, @DateTime, @Description, @Address, @PoliceStation, @EvidenceFilePath, @Status)";
-            await using var cmd = new MySqlCommand(query, db);
-            cmd.Parameters.AddWithValue("@UserId", model.UserId);
-            cmd.Parameters.AddWithValue("@FullName", model.FullName);
-            cmd.Parameters.AddWithValue("@MobileNumber", model.MobileNumber);
-            cmd.Parameters.AddWithValue("@IncidentType", model.IncidentType);
-            cmd.Parameters.AddWithValue("@DateTime", model.DateTime);
-            cmd.Parameters.AddWithValue("@Description", model.Description);
-            cmd.Parameters.AddWithValue("@Address", model.Address);
-            cmd.Parameters.AddWithValue("@PoliceStation", model.PoliceStation);
-            cmd.Parameters.AddWithValue("@EvidenceFilePath", string.Join(",", model.EvidenceFilePath));
-            cmd.Parameters.AddWithValue("@Status", "In Progress");
-
-            await db.OpenAsync();
-            await cmd.ExecuteNonQueryAsync();
-
-            return Results.Ok(new { Message = "Police report submitted successfully." });
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while creating the police report.", Error = ex.Message });
+            }
         });
 
         // Retrieve all police reports
         app.MapGet("/getreports", async (MySqlConnection db) =>
         {
-            var reports = await RetrieveReports("SELECT * FROM PoliceReports", db);
-            return Results.Ok(reports);
+            try
+            {
+                var reports = await RetrieveReports("SELECT * FROM PoliceReports", db);
+                return Results.Ok(reports);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while retrieving the reports.", Error = ex.Message });
+            }
         });
 
         // Retrieve police reports by UserId
         app.MapGet("/getreports/user/{userId:int}", async (int userId, MySqlConnection db) =>
         {
-            var reports = await RetrieveReports("SELECT * FROM PoliceReports WHERE UserId = @UserId", db, new MySqlParameter("@UserId", userId));
-            return Results.Ok(reports);
+            try
+            {
+                var reports = await RetrieveReports("SELECT * FROM PoliceReports WHERE UserId = @UserId", db, new MySqlParameter("@UserId", userId));
+                return Results.Ok(reports);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while retrieving the reports by user ID.", Error = ex.Message });
+            }
         });
 
         // Retrieve police reports by PoliceStation
         app.MapGet("/getreports/helpcenter/{helpCenterName}", async (string helpCenterName, MySqlConnection db) =>
         {
-            var reports = await RetrieveReports("SELECT * FROM PoliceReports WHERE PoliceStation = @HelpCenterName", db, new MySqlParameter("@HelpCenterName", helpCenterName));
-            return Results.Ok(reports);
+            try
+            {
+                var reports = await RetrieveReports("SELECT * FROM PoliceReports WHERE PoliceStation = @HelpCenterName", db, new MySqlParameter("@HelpCenterName", helpCenterName));
+                return Results.Ok(reports);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while retrieving the reports by help center name.", Error = ex.Message });
+            }
         });
-
 
         // Update police report
         app.MapPut("/updatereport/{id:int}", async (int id, PoliceReportModel model, MySqlConnection db) =>
         {
-            if (!IsValid(model, out var validationErrors))
+            try
             {
-                return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
+                if (!IsValid(model, out var validationErrors))
+                {
+                    return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
+                }
+
+                var query = "UPDATE PoliceReports SET FullName = @FullName, MobileNumber = @MobileNumber, IncidentType = @IncidentType, DateTime = @DateTime, Description = @Description, Address = @Address, PoliceStation = @PoliceStation, EvidenceFilePath = @EvidenceFilePath, Status = @Status WHERE Id = @Id";
+                await using var cmd = new MySqlCommand(query, db);
+                cmd.Parameters.AddWithValue("@Id", id);
+                cmd.Parameters.AddWithValue("@FullName", model.FullName);
+                cmd.Parameters.AddWithValue("@MobileNumber", model.MobileNumber);
+                cmd.Parameters.AddWithValue("@IncidentType", model.IncidentType);
+                cmd.Parameters.AddWithValue("@DateTime", model.DateTime);
+                cmd.Parameters.AddWithValue("@Description", model.Description);
+                cmd.Parameters.AddWithValue("@Address", model.Address);
+                cmd.Parameters.AddWithValue("@PoliceStation", model.PoliceStation);
+                cmd.Parameters.AddWithValue("@EvidenceFilePath", string.Join(",", model.EvidenceFilePath));
+                cmd.Parameters.AddWithValue("@Status", model.Status);
+
+                await db.OpenAsync();
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                return rowsAffected > 0 ? Results.Ok(new { Message = "Police report updated successfully." }) : Results.NotFound(new { Message = "Police report not found." });
             }
-
-            var query = "UPDATE PoliceReports SET FullName = @FullName, MobileNumber = @MobileNumber, IncidentType = @IncidentType, DateTime = @DateTime, Description = @Description, Address = @Address, PoliceStation = @PoliceStation, EvidenceFilePath = @EvidenceFilePath, Status = @Status WHERE Id = @Id";
-            await using var cmd = new MySqlCommand(query, db);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.Parameters.AddWithValue("@FullName", model.FullName);
-            cmd.Parameters.AddWithValue("@MobileNumber", model.MobileNumber);
-            cmd.Parameters.AddWithValue("@IncidentType", model.IncidentType);
-            cmd.Parameters.AddWithValue("@DateTime", model.DateTime);
-            cmd.Parameters.AddWithValue("@Description", model.Description);
-            cmd.Parameters.AddWithValue("@Address", model.Address);
-            cmd.Parameters.AddWithValue("@PoliceStation", model.PoliceStation);
-            cmd.Parameters.AddWithValue("@EvidenceFilePath", string.Join(",", model.EvidenceFilePath));
-            cmd.Parameters.AddWithValue("@Status", model.Status);
-
-            await db.OpenAsync();
-            var rowsAffected = await cmd.ExecuteNonQueryAsync();
-            return rowsAffected > 0 ? Results.Ok(new { Message = "Police report updated successfully." }) : Results.NotFound(new { Message = "Police report not found." });
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while updating the police report.", Error = ex.Message });
+            }
         });
 
+        // Endpoint to Mark Report as Solved (Automatic Status Update)
+        app.MapPost("/markassolved/{id:int}", async (int id, MySqlConnection db) =>
+        {
+            try
+            {
+                var query = "UPDATE PoliceReports SET Status = @Status WHERE Id = @Id";
+                await using var cmd = new MySqlCommand(query, db);
+                cmd.Parameters.AddWithValue("@Id", id);
+                cmd.Parameters.AddWithValue("@Status", "Solved");
 
-// Endpoint to Mark Report as Solved (Automatic Status Update)
-app.MapPost("/markassolved/{id:int}", async (int id, MySqlConnection db) =>
-{
-    var query = "UPDATE PoliceReports SET Status = @Status WHERE Id = @Id";
-    await using var cmd = new MySqlCommand(query, db);
-    cmd.Parameters.AddWithValue("@Id", id);
-    cmd.Parameters.AddWithValue("@Status", "Solved");
-
-    await db.OpenAsync();
-    var rowsAffected = await cmd.ExecuteNonQueryAsync();
-    return rowsAffected > 0
-        ? Results.Ok(new { Message = "Status updated to Solved." })
-        : Results.NotFound(new { Message = "Police report not found." });
-});
+                await db.OpenAsync();
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                return rowsAffected > 0
+                    ? Results.Ok(new { Message = "Status updated to Solved." })
+                    : Results.NotFound(new { Message = "Police report not found." });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while marking the report as solved.", Error = ex.Message });
+            }
+        });
 
         // Delete police report
         app.MapDelete("/deletereport/{id:int}", async (int id, MySqlConnection db) =>
         {
-            var query = "DELETE FROM PoliceReports WHERE Id = @Id";
-            await using var cmd = new MySqlCommand(query, db);
-            cmd.Parameters.AddWithValue("@Id", id);
+            try
+            {
+                var query = "DELETE FROM PoliceReports WHERE Id = @Id";
+                await using var cmd = new MySqlCommand(query, db);
+                cmd.Parameters.AddWithValue("@Id", id);
 
-            await db.OpenAsync();
-            var rowsAffected = await cmd.ExecuteNonQueryAsync();
-            return rowsAffected > 0 ? Results.Ok(new { Message = "Police report deleted successfully." }) : Results.NotFound(new { Message = "Police report not found." });
+                await db.OpenAsync();
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                return rowsAffected > 0 ? Results.Ok(new { Message = "Police report deleted successfully." }) : Results.NotFound(new { Message = "Police report not found." });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while deleting the police report.", Error = ex.Message });
+            }
         });
     }
 
