@@ -34,29 +34,31 @@ public static class UserEndpoints
 
        
 
-        // Register a new admin (for setup purposes)
-        app.MapPost("/registeradmin", async (AdminRegistrationModel model, MySqlConnection db) =>
-        {
-            if (!IsValid(model, out var validationErrors))
-            {
-                return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
-            }
+      // Register a new admin (for setup purposes)
+app.MapPost("/registeradmin", async (AdminRegistrationModel model, MySqlConnection db) =>
+{
+    if (!IsValid(model, out var validationErrors))
+    {
+        return Results.BadRequest(new { Message = "Validation failed.", Errors = validationErrors });
+    }
 
-            // Do not hash the password for admin
-            var query = "INSERT INTO Admins (FullName, Email, PhoneNumber, Address, Password, Role) VALUES (@FullName, @Email, @PhoneNumber, @Address, @Password, @Role)";
-            await using var cmd = new MySqlCommand(query, db);
-            cmd.Parameters.AddWithValue("@FullName", model.FullName);
-            cmd.Parameters.AddWithValue("@Email", model.Email);
-            cmd.Parameters.AddWithValue("@PhoneNumber", model.PhoneNumber);
-            cmd.Parameters.AddWithValue("@Address", model.Address);
-            cmd.Parameters.AddWithValue("@Password", model.Password); // Store the plain password
-            cmd.Parameters.AddWithValue("@Role", "Admin");
+    // Hash the password for admin
+    model.Password = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
-            await db.OpenAsync();
-            await cmd.ExecuteNonQueryAsync();
+    var query = "INSERT INTO Admins (FullName, Email, PhoneNumber, Address, Password, Role) VALUES (@FullName, @Email, @PhoneNumber, @Address, @Password, @Role)";
+    await using var cmd = new MySqlCommand(query, db);
+    cmd.Parameters.AddWithValue("@FullName", model.FullName);
+    cmd.Parameters.AddWithValue("@Email", model.Email);
+    cmd.Parameters.AddWithValue("@PhoneNumber", model.PhoneNumber);
+    cmd.Parameters.AddWithValue("@Address", model.Address);
+    cmd.Parameters.AddWithValue("@Password", model.Password); // Store the hashed password
+    cmd.Parameters.AddWithValue("@Role", "Admin");
 
-            return Results.Ok(new { Message = "Admin registered successfully." });
-        });
+    await db.OpenAsync();
+    await cmd.ExecuteNonQueryAsync();
+
+    return Results.Ok(new { Message = "Admin registered successfully." });
+});
 
          // Register Help Center
         app.MapPost("/registerhelpcenter", async (HelpCenterRegistrationModel model, MySqlConnection db) =>
@@ -86,117 +88,7 @@ public static class UserEndpoints
             return Results.Ok(new { Message = "Help center registered successfully." });
         });
 
-        // Login user (Admin, Normal User, or Help Center)
-        app.MapPost("/login", async (LoginModel loginModel, HttpContext httpContext, MySqlConnection db) =>
-        {
-            if (!IsValid(loginModel, out var loginErrors))
-            {
-                return Results.BadRequest(new { Message = "Validation failed.", Errors = loginErrors });
-            }
-
-            var query = "SELECT Id, FullName, Email, PhoneNumber, Address, Password, 'Normal User' AS Role FROM Users WHERE Email = @Email";
-            await using var cmd = new MySqlCommand(query, db);
-            cmd.Parameters.AddWithValue("@Email", loginModel.Email);
-
-            await db.OpenAsync();
-            MySqlDataReader reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-
-            if (!await reader.ReadAsync())
-            {
-                // Check HelpCenters table if not found in Users
-                await reader.CloseAsync();
-                query = "SELECT Id, FullName, Address, Email, PhoneNumber, Password, 'HelpCenter' AS Role FROM HelpCenters WHERE Email = @Email";
-                cmd.CommandText = query;
-                cmd.Parameters.Clear();  // Clear previous parameters
-                cmd.Parameters.AddWithValue("@Email", loginModel.Email);
-
-                reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-
-                if (!await reader.ReadAsync())
-                {
-                    // Check Admins table if not found in HelpCenters
-                    await reader.CloseAsync();
-                    query = "SELECT Id, FullName, Email, PhoneNumber, Address, Password, 'Admin' AS Role FROM Admins WHERE Email = @Email";
-                    cmd.CommandText = query;
-                    cmd.Parameters.Clear();  // Clear previous parameters
-                    cmd.Parameters.AddWithValue("@Email", loginModel.Email);
-
-                    reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-
-                    if (!await reader.ReadAsync())
-                    {
-                        return Results.BadRequest(new { Message = "User not found." });
-                    }
-                }
-            }
-
-            var userId = reader.GetInt32(0);
-            var fullName = reader.GetString(1);
-            var email = reader.GetString(2);
-            var phoneNumber = reader.GetString(3);
-            var address = reader.GetString(4);
-            var hashedPassword = reader.GetString(5);
-            var role = reader.GetString(6);
-
-            // Verify password
-            if (role == "Admin")
-            {
-                if (loginModel.Password != hashedPassword)
-                {
-                    return Results.BadRequest(new { Message = "Invalid password." });
-                }
-            }
-            else
-            {
-                if (!BCrypt.Net.BCrypt.Verify(loginModel.Password, hashedPassword))
-                {
-                    return Results.BadRequest(new { Message = "Invalid password." });
-                }
-            }
-
-            // Set authentication cookie
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, email),
-                new Claim(ClaimTypes.Role, role)
-            };
-            var claimsIdentity = new ClaimsIdentity(claims, "CookieAuth");
-            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-            await httpContext.SignInAsync("CookieAuth", claimsPrincipal);
-
-            object user;
-            if (role == "HelpCenter")
-            {
-               
-                
-                user = new
-                {
-                    Id = userId,
-                    FullName = fullName,
-                    Email = email,
-                    PhoneNumber = phoneNumber,
-                    Address = address,
-                   
-                    Role = role,
-                    Password = (string)null // Do not include the password in the response
-                };
-            }
-            else
-            {
-                user = new
-                {
-                    Id = userId,
-                    FullName = fullName,
-                    Email = email,
-                    PhoneNumber = phoneNumber,
-                    Address = address,
-                    Role = role,
-                    Password = (string)null // Do not include the password in the response
-                };
-            }
-
-            return Results.Ok(new { Message = $"Login successful. Role: {role}", UserDetails = user });
-        });
+        
 
 
         // Update user information
@@ -459,6 +351,116 @@ public static class UserEndpoints
 
             return Results.NotFound(new { Message = "Admin not found." });
         });
+
+//Login
+app.MapPost("/login", async (LoginModel loginModel, HttpContext httpContext, MySqlConnection db) =>
+{
+    if (!IsValid(loginModel, out var loginErrors))
+    {
+        return Results.BadRequest(new { Message = "Validation failed.", Errors = loginErrors });
+    }
+
+    string role = null;
+    var query = "SELECT Id, FullName, Email, PhoneNumber, Address, Password, 'Normal User' AS Role FROM Users WHERE Email = @Email";
+    await using var cmd = new MySqlCommand(query, db);
+    cmd.Parameters.AddWithValue("@Email", loginModel.Email);
+
+    await db.OpenAsync();
+    MySqlDataReader reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+
+    if (!await reader.ReadAsync())
+    {
+        // Check HelpCenters table if not found in Users
+        await reader.CloseAsync();
+        query = "SELECT Id, FullName, Address, Email, PhoneNumber, Password,'HelpCenter' AS Role, Latitude, Longitude FROM HelpCenters WHERE Email = @Email";
+        cmd.CommandText = query;
+        cmd.Parameters.Clear();  // Clear previous parameters
+        cmd.Parameters.AddWithValue("@Email", loginModel.Email);
+
+        reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+        {
+            // Check Admins table if not found in HelpCenters
+            await reader.CloseAsync();
+            query = "SELECT Id, FullName, Email, PhoneNumber, Address, Password, 'Admin' AS Role FROM Admins WHERE Email = @Email";
+            cmd.CommandText = query;
+            cmd.Parameters.Clear();  // Clear previous parameters
+            cmd.Parameters.AddWithValue("@Email", loginModel.Email);
+
+            reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+
+            if (!await reader.ReadAsync())
+            {
+                return Results.BadRequest(new { Message = "User not found." });
+            }
+        }
+    }
+
+    var userId = reader.GetInt32(0);
+    var fullName = reader.GetString(1);
+    var email = reader.GetString(2);
+    var phoneNumber = reader.GetString(3);
+    var address = reader.GetString(4);
+    var hashedPassword = reader.GetString(5);
+    role = reader.GetString(6);
+
+    // Verify password
+    if (!BCrypt.Net.BCrypt.Verify(loginModel.Password, hashedPassword))
+    {
+        return Results.BadRequest(new { Message = "Invalid password." });
+    }
+
+    // Store user details in session
+    httpContext.Session.SetInt32("UserId", userId);
+    httpContext.Session.SetString("FullName", fullName);
+    httpContext.Session.SetString("Email", email);
+    httpContext.Session.SetString("PhoneNumber", phoneNumber);
+    httpContext.Session.SetString("Address", address);
+    httpContext.Session.SetString("Role", role);
+
+    if (role == "HelpCenter")
+    {
+        var latitude = reader.GetDouble(7);
+        var longitude = reader.GetDouble(8);
+        httpContext.Session.SetString("Latitude", latitude.ToString());
+        httpContext.Session.SetString("Longitude", longitude.ToString());
+    }
+
+    return Results.Ok(new { Message = $"Login successful. Role: {role}" });
+});
+
+app.MapGet("/profile", (HttpContext httpContext) =>
+{
+    var userId = httpContext.Session.GetInt32("UserId");
+    var fullName = httpContext.Session.GetString("FullName");
+    var email = httpContext.Session.GetString("Email");
+    var phoneNumber = httpContext.Session.GetString("PhoneNumber");
+    var address = httpContext.Session.GetString("Address");
+    var role = httpContext.Session.GetString("Role");
+    var latitude = httpContext.Session.GetString("Latitude");
+    var longitude = httpContext.Session.GetString("Longitude");
+
+    if (userId == null || fullName == null || email == null || phoneNumber == null || address == null || role == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = new
+    {
+        Id = userId,
+        FullName = fullName,
+        Email = email,
+        PhoneNumber = phoneNumber,
+        Address = address,
+        Role = role,
+        Latitude = latitude != null ? double.Parse(latitude) : (double?)null,
+        Longitude = longitude != null ? double.Parse(longitude) : (double?)null
+    };
+
+    return Results.Ok(new { Message = "Profile retrieved successfully.", UserDetails = user });
+});
+
     }
 
     private static bool IsValid<T>(T model, out List<string> validationErrors)
@@ -476,6 +478,8 @@ public static class UserEndpoints
         return isValid;
     }
 }
+
+
 
 public class UserRegistrationModel
 {

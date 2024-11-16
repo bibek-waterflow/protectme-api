@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Data;
 using MySql.Data.MySqlClient;
-
 
 public static class PoliceReportEndpoints
 {
@@ -33,121 +33,27 @@ public static class PoliceReportEndpoints
             return Results.Ok(new { Message = "Police report submitted successfully." });
         });
 
-        // GET: Retrieve all police reports
+        // Retrieve all police reports
         app.MapGet("/getreports", async (MySqlConnection db) =>
         {
-            try
-            {
-                var reports = new List<PoliceReportModel>();
-
-                var query = "SELECT Id, UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath, Status FROM PoliceReports";
-                await using var cmd = new MySqlCommand(query, db);
-                await db.OpenAsync();
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                {
-                    reports.Add(new PoliceReportModel
-                    {
-                        Id = reader.GetInt32(0),
-                        UserId = reader.GetInt32(1),
-                        FullName = reader.GetString(2),
-                        MobileNumber = reader.GetString(3),
-                        IncidentType = reader.GetString(4),
-                        DateTime = reader.GetDateTime(5),
-                        Description = reader.GetString(6),
-                        Address = reader.GetString(7),
-                        PoliceStation = reader.GetString(8),
-                        EvidenceFilePath = reader.GetString(9).Split(',').ToList(),
-                        Status = reader.GetString(10)
-                    });
-                }
-
-                return Results.Ok(reports);
-            }
-            catch (Exception ex)
-            {
-                return Results.StatusCode(500);
-            }
+            var reports = await RetrieveReports("SELECT * FROM PoliceReports", db);
+            return Results.Ok(reports);
         });
 
-        // GET: Retrieve police reports by UserId
+        // Retrieve police reports by UserId
         app.MapGet("/getreports/user/{userId:int}", async (int userId, MySqlConnection db) =>
         {
-            try
-            {
-                var reports = new List<PoliceReportModel>();
-
-                var query = "SELECT Id, UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath, Status FROM PoliceReports WHERE UserId = @UserId";
-                await using var cmd = new MySqlCommand(query, db);
-                cmd.Parameters.AddWithValue("@UserId", userId);
-                await db.OpenAsync();
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                {
-                    reports.Add(new PoliceReportModel
-                    {
-                        Id = reader.GetInt32(0),
-                        UserId = reader.GetInt32(1),
-                        FullName = reader.GetString(2),
-                        MobileNumber = reader.GetString(3),
-                        IncidentType = reader.GetString(4),
-                        DateTime = reader.GetDateTime(5),
-                        Description = reader.GetString(6),
-                        Address = reader.GetString(7),
-                        PoliceStation = reader.GetString(8),
-                        EvidenceFilePath = reader.GetString(9).Split(',').ToList(),
-                        Status = reader.GetString(10)
-                    });
-                }
-
-                return Results.Ok(reports);
-            }
-            catch (Exception ex)
-            {
-                return Results.StatusCode(500);
-            }
+            var reports = await RetrieveReports("SELECT * FROM PoliceReports WHERE UserId = @UserId", db, new MySqlParameter("@UserId", userId));
+            return Results.Ok(reports);
         });
 
-        // GET: Retrieve police reports by HelpCenterName
+        // Retrieve police reports by PoliceStation
         app.MapGet("/getreports/helpcenter/{helpCenterName}", async (string helpCenterName, MySqlConnection db) =>
         {
-            try
-            {
-                var reports = new List<PoliceReportModel>();
-
-                var query = "SELECT Id, UserId, FullName, MobileNumber, IncidentType, DateTime, Description, Address, PoliceStation, EvidenceFilePath, Status FROM PoliceReports WHERE PoliceStation = @HelpCenterName";
-                await using var cmd = new MySqlCommand(query, db);
-                cmd.Parameters.AddWithValue("@HelpCenterName", helpCenterName);
-                await db.OpenAsync();
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                {
-                    reports.Add(new PoliceReportModel
-                    {
-                        Id = reader.GetInt32(0),
-                        UserId = reader.GetInt32(1),
-                        FullName = reader.GetString(2),
-                        MobileNumber = reader.GetString(3),
-                        IncidentType = reader.GetString(4),
-                        DateTime = reader.GetDateTime(5),
-                        Description = reader.GetString(6),
-                        Address = reader.GetString(7),
-                        PoliceStation = reader.GetString(8),
-                        EvidenceFilePath = reader.GetString(9).Split(',').ToList(),
-                        Status = reader.GetString(10)
-                    });
-                }
-
-                return Results.Ok(reports);
-            }
-            catch (Exception ex)
-            {
-                return Results.StatusCode(500);
-            }
+            var reports = await RetrieveReports("SELECT * FROM PoliceReports WHERE PoliceStation = @HelpCenterName", db, new MySqlParameter("@HelpCenterName", helpCenterName));
+            return Results.Ok(reports);
         });
+
 
         // Update police report
         app.MapPut("/updatereport/{id:int}", async (int id, PoliceReportModel model, MySqlConnection db) =>
@@ -175,6 +81,22 @@ public static class PoliceReportEndpoints
             return rowsAffected > 0 ? Results.Ok(new { Message = "Police report updated successfully." }) : Results.NotFound(new { Message = "Police report not found." });
         });
 
+
+// Endpoint to Mark Report as Solved (Automatic Status Update)
+app.MapPost("/markassolved/{id:int}", async (int id, MySqlConnection db) =>
+{
+    var query = "UPDATE PoliceReports SET Status = @Status WHERE Id = @Id";
+    await using var cmd = new MySqlCommand(query, db);
+    cmd.Parameters.AddWithValue("@Id", id);
+    cmd.Parameters.AddWithValue("@Status", "Solved");
+
+    await db.OpenAsync();
+    var rowsAffected = await cmd.ExecuteNonQueryAsync();
+    return rowsAffected > 0
+        ? Results.Ok(new { Message = "Status updated to Solved." })
+        : Results.NotFound(new { Message = "Police report not found." });
+});
+
         // Delete police report
         app.MapDelete("/deletereport/{id:int}", async (int id, MySqlConnection db) =>
         {
@@ -188,18 +110,48 @@ public static class PoliceReportEndpoints
         });
     }
 
+    private static async Task<List<PoliceReportModel>> RetrieveReports(string query, MySqlConnection db, params MySqlParameter[] parameters)
+    {
+        var reports = new List<PoliceReportModel>();
+        await using var cmd = new MySqlCommand(query, db);
+        
+        foreach (var parameter in parameters)
+        {
+            cmd.Parameters.Add(parameter);
+        }
+
+        await db.OpenAsync();
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            reports.Add(new PoliceReportModel
+            {
+                Id = reader.GetInt32("Id"),
+                UserId = reader.GetInt32("UserId"),
+                FullName = reader.GetString("FullName"),
+                MobileNumber = reader.GetString("MobileNumber"),
+                IncidentType = reader.GetString("IncidentType"),
+                DateTime = reader.GetDateTime("DateTime"),
+                Description = reader.GetString("Description"),
+                Address = reader.GetString("Address"),
+                PoliceStation = reader.GetString("PoliceStation"),
+                EvidenceFilePath = reader.GetString("EvidenceFilePath").Split(',').ToList(),
+                Status = reader.GetString("Status")
+            });
+        }
+
+        return reports;
+    }
+
     private static bool IsValid<T>(T model, out List<string> validationErrors)
     {
         validationErrors = new List<string>();
-        var validationContext = new ValidationContext(model, null, null);
+        var validationContext = new ValidationContext(model);
         var results = new List<ValidationResult>();
         var isValid = Validator.TryValidateObject(model, validationContext, results, true);
 
-        foreach (var validationResult in results)
-        {
-            validationErrors.Add(validationResult.ErrorMessage);
-        }
-
+        validationErrors.AddRange(results.Select(result => result.ErrorMessage));
         return isValid;
     }
 }
@@ -208,13 +160,17 @@ public class PoliceReportModel
 {
     public int Id { get; set; }
     public int UserId { get; set; }
+    [Required]
     public string FullName { get; set; }
+    [Required]
+    [Phone]
     public string MobileNumber { get; set; }
+    [Required]
     public string IncidentType { get; set; }
     public DateTime DateTime { get; set; }
     public string Description { get; set; }
     public string Address { get; set; }
     public string PoliceStation { get; set; }
-    public List<string> EvidenceFilePath { get; set; }
+    public List<string> EvidenceFilePath { get; set; } = new List<string>();
     public string Status { get; set; }
 }
