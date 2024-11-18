@@ -603,6 +603,95 @@ app.MapGet("/getemergencycontact/{id:int}", async (int id, MySqlConnection db) =
     }
 });
 
+ // Get user details by email
+        app.MapGet("/user/email/{email}", async (string email, MySqlConnection db) =>
+        {
+            try
+            {
+                await db.OpenAsync();
+                MySqlDataReader reader;
+
+                // Check Users table
+                var query = "SELECT Id, FullName, Email, PhoneNumber, Address, 'Normal User' AS Role FROM Users WHERE Email = @Email";
+                await using (var cmd = new MySqlCommand(query, db))
+                {
+                    cmd.Parameters.AddWithValue("@Email", email);
+                    reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var user = new
+                        {
+                            Id = reader.GetInt32(0),
+                            FullName = reader.GetString(1),
+                            Email = reader.GetString(2),
+                            PhoneNumber = reader.GetString(3),
+                            Address = reader.GetString(4),
+                            Role = reader.GetString(5)
+                        };
+                        return Results.Ok(user);
+                    }
+                }
+
+                await reader.CloseAsync();
+
+                // Check HelpCenters table
+                query = "SELECT Id, FullName, Email, PhoneNumber, Address,'HelpCenter' AS Role, Latitude, Longitude FROM HelpCenters WHERE Email = @Email";
+                await using (var cmd = new MySqlCommand(query, db))
+                {
+                    cmd.Parameters.AddWithValue("@Email", email);
+                    reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var helpCenter = new
+                        {
+                            Id = reader.GetInt32(0),
+                            FullName = reader.GetString(1),
+                            Email = reader.GetString(2),
+                            PhoneNumber = reader.GetString(3),
+                            Address = reader.GetString(4),
+                            Latitude = reader.GetDouble(5),
+                            Longitude = reader.GetDouble(6),
+                            Role = reader.GetString(7)
+                        };
+                        return Results.Ok(helpCenter);
+                    }
+                }
+
+                await reader.CloseAsync();
+
+                // Check Admins table
+                query = "SELECT Id, FullName, Email, PhoneNumber, Address, 'Admin' AS Role FROM Admins WHERE Email = @Email";
+                await using (var cmd = new MySqlCommand(query, db))
+                {
+                    cmd.Parameters.AddWithValue("@Email", email);
+                    reader = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var admin = new
+                        {
+                            Id = reader.GetInt32(0),
+                            FullName = reader.GetString(1),
+                            Email = reader.GetString(2),
+                            PhoneNumber = reader.GetString(3),
+                            Address = reader.GetString(4),
+                            Role = reader.GetString(5)
+                        };
+                        return Results.Ok(admin);
+                    }
+                }
+
+                return Results.NotFound(new { Message = "User not found." });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Message = "An error occurred while retrieving the user details.", Error = ex.Message });
+            }
+        });
+
+
     }
 
     private static bool IsValid<T>(T model, out List<string> validationErrors)
