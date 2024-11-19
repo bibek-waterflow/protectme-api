@@ -155,6 +155,37 @@ public static class PoliceReportEndpoints
                 return Results.BadRequest(new { Message = "An error occurred while deleting the police report.", Error = ex.Message });
             }
         });
+
+        app.MapGet("/getlocation", async (double latitude, double longitude, IConfiguration config) =>
+{
+    var apiKey = config["GoogleMapsApiKey"];
+    if (string.IsNullOrEmpty(apiKey))
+    {
+        return Results.BadRequest(new { Message = "Google Maps API key is missing." });
+    }
+
+    var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={latitude},{longitude}&key={apiKey}";
+
+    try
+    {
+        using var client = new HttpClient();
+        var response = await client.GetAsync(url);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Results.BadRequest(new { Message = "Failed to fetch location name from Google Maps." });
+        }
+
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        return Results.Ok(new { Message = "Location fetched successfully", Data = jsonResponse });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"An error occurred: {ex.Message}");
+    }
+})
+.WithName("GetLocation");
+
     }
 
     private static async Task<List<PoliceReportModel>> RetrieveReports(string query, MySqlConnection db, params MySqlParameter[] parameters)
@@ -186,6 +217,8 @@ public static class PoliceReportEndpoints
                 EvidenceFilePath = reader.GetString("EvidenceFilePath").Split(',').ToList(),
                 Status = reader.GetString("Status")
             });
+
+            
         }
 
         return reports;

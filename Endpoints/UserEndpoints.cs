@@ -634,9 +634,9 @@ app.MapGet("/getemergencycontact/{id:int}", async (int id, MySqlConnection db) =
                 }
 
                 await reader.CloseAsync();
-
+//SELECT Id, FullName, Address, Email, PhoneNumber, Latitude, Longitude FROM HelpCenters
                 // Check HelpCenters table
-                query = "SELECT Id, FullName, Email, PhoneNumber, Address,'HelpCenter' AS Role, Latitude, Longitude FROM HelpCenters WHERE Email = @Email";
+                query = "SELECT Id, FullName, Address,Email, PhoneNumber, Latitude, Longitude,'HelpCenter' AS Role FROM HelpCenters WHERE Email = @Email";
                 await using (var cmd = new MySqlCommand(query, db))
                 {
                     cmd.Parameters.AddWithValue("@Email", email);
@@ -646,14 +646,15 @@ app.MapGet("/getemergencycontact/{id:int}", async (int id, MySqlConnection db) =
                     {
                         var helpCenter = new
                         {
-                            Id = reader.GetInt32(0),
-                            FullName = reader.GetString(1),
-                            Email = reader.GetString(2),
-                            PhoneNumber = reader.GetString(3),
-                            Address = reader.GetString(4),
-                            Latitude = reader.GetDouble(5),
-                            Longitude = reader.GetDouble(6),
-                            Role = reader.GetString(7)
+                          Id = reader.GetInt32(0),
+                        FullName = reader.GetString(1),
+                        Address = reader.GetString(2),
+                        Email = reader.GetString(3),
+                        PhoneNumber = reader.GetString(4),
+                        Latitude = reader.GetDouble(5),
+                        Longitude = reader.GetDouble(6),
+                       
+                            
                         };
                         return Results.Ok(helpCenter);
                     }
