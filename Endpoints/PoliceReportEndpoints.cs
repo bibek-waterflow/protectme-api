@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Data;
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 
 public static class PoliceReportEndpoints
@@ -155,6 +157,49 @@ public static class PoliceReportEndpoints
                 return Results.BadRequest(new { Message = "An error occurred while deleting the police report.", Error = ex.Message });
             }
         });
+
+        app.MapGet("/getlocation", async (double latitude, double longitude, IConfiguration config) =>
+{
+    var apiKey = config["PositionStackApiKey"];  // Store your PositionStack API key in appsettings.json or secrets
+    if (string.IsNullOrEmpty(apiKey))
+    {
+        return Results.BadRequest(new { Message = "PositionStack API key is missing." });
+    }
+
+    var url = $"https://api.positionstack.com/v1/reverse?access_key={apiKey}&query={latitude},{longitude}";
+
+    try
+    {
+        using var client = new HttpClient();
+        var response = await client.GetAsync(url);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Results.BadRequest(new { Message = "Failed to fetch location name from PositionStack." });
+        }
+
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        var locationData = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(jsonResponse);
+        
+        // Assuming PositionStack response has the 'data' array and each element has a 'label' for address
+        if (locationData.TryGetProperty("data", out var data) && data[0].TryGetProperty("label", out var label))
+        {
+            return Results.Ok(new { Message = "Location fetched successfully", Data = label.GetString() });
+        }
+        else
+        {
+            return Results.BadRequest(new { Message = "Failed to extract location data from response." });
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"An error occurred: {ex.Message}");
+    }
+})
+.WithName("GetLocation");
+
+
+
     }
 
     private static async Task<List<PoliceReportModel>> RetrieveReports(string query, MySqlConnection db, params MySqlParameter[] parameters)
@@ -221,3 +266,4 @@ public class PoliceReportModel
     public List<string> EvidenceFilePath { get; set; } = new List<string>();
     public string Status { get; set; }
 }
+
