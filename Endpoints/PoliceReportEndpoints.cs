@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Data;
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 
 public static class PoliceReportEndpoints
@@ -158,13 +160,13 @@ public static class PoliceReportEndpoints
 
         app.MapGet("/getlocation", async (double latitude, double longitude, IConfiguration config) =>
 {
-    var apiKey = config["GoogleMapsApiKey"];
+    var apiKey = config["PositionStackApiKey"];  // Store your PositionStack API key in appsettings.json or secrets
     if (string.IsNullOrEmpty(apiKey))
     {
-        return Results.BadRequest(new { Message = "Google Maps API key is missing." });
+        return Results.BadRequest(new { Message = "PositionStack API key is missing." });
     }
 
-    var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={latitude},{longitude}&key={apiKey}";
+    var url = $"https://api.positionstack.com/v1/reverse?access_key={apiKey}&query={latitude},{longitude}";
 
     try
     {
@@ -173,11 +175,21 @@ public static class PoliceReportEndpoints
 
         if (!response.IsSuccessStatusCode)
         {
-            return Results.BadRequest(new { Message = "Failed to fetch location name from Google Maps." });
+            return Results.BadRequest(new { Message = "Failed to fetch location name from PositionStack." });
         }
 
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        return Results.Ok(new { Message = "Location fetched successfully", Data = jsonResponse });
+        var locationData = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(jsonResponse);
+        
+        // Assuming PositionStack response has the 'data' array and each element has a 'label' for address
+        if (locationData.TryGetProperty("data", out var data) && data[0].TryGetProperty("label", out var label))
+        {
+            return Results.Ok(new { Message = "Location fetched successfully", Data = label.GetString() });
+        }
+        else
+        {
+            return Results.BadRequest(new { Message = "Failed to extract location data from response." });
+        }
     }
     catch (Exception ex)
     {
@@ -185,6 +197,8 @@ public static class PoliceReportEndpoints
     }
 })
 .WithName("GetLocation");
+
+
 
     }
 
@@ -217,8 +231,6 @@ public static class PoliceReportEndpoints
                 EvidenceFilePath = reader.GetString("EvidenceFilePath").Split(',').ToList(),
                 Status = reader.GetString("Status")
             });
-
-            
         }
 
         return reports;
@@ -254,3 +266,4 @@ public class PoliceReportModel
     public List<string> EvidenceFilePath { get; set; } = new List<string>();
     public string Status { get; set; }
 }
+
